@@ -168,3 +168,40 @@ curl -s -u bootstrap:bootstrap -X POST http://localhost:8080/api/lens \
   -H 'X-Operator-Id: 1001' -H 'X-Request-No: LENS-0001' \
   -d '{"lensCode":"L-001","lensName":"1.60非球面","price":399.00}'
 ```
+
+## 对外开放加工单查询（HMAC 签名）
+
+对外开放只读查询不走内部账号体系，Shiro 对 `/open/api/**` 放行，鉴权完全以 HMAC 签名为准：
+
+- `GET /open/api/orders/by-no/{orderNo}` 按单号检索（结构同内部接口：主单+处方+状态流转+返修）
+- `GET /open/api/orders?status=&storeCode=` 列表
+
+请求头：
+
+| 头 | 含义 |
+|---|---|
+| `X-Access-Key` | 调用方标识（密钥在 `evops.openapi.access-keys` 配置，生产用外部配置/环境变量注入） |
+| `X-Timestamp` | 发起时刻 epoch 毫秒；与服务端偏差 **超过 15 分钟一律拒收** |
+| `X-Nonce` | 一次性随机串（≤64 字符）；**30 分钟窗口内同 accessKey + nonce 直接拒绝**，过期行定时物理清理（每分钟扫描，启动补扫） |
+| `X-Signature` | 见下，HMAC-SHA256 小写十六进制 |
+
+待签名串为 6 行、`\n` 分隔：`METHOD`（大写）、请求路径（不含 query）、**参数按字典序排序**后的 `k=v`（多值逐项展开，值取 URL 解码原文，`&` 连接）、accessKey、timestamp、nonce。参数在 query 里的先后顺序不影响验签。
+
+失败码：验签类问题（缺头/未知调用方/时间窗外/签名不符）统一回 `OPEN_SIGN_INVALID`「请求签名校验未通过」，**不区分原因、不回任何细节**（具体原因只进服务端日志，带 traceId）；nonce 重放回 `OPEN_NONCE_DUPLICATED`。签名比较为定长比较。
+
+签名示例：
+
+```bash
+AK=demo-ak; SK=demo-secret-change-me
+TS=$(date +%s%3N); NONCE=$(uuidgen)
+QS='status=CREATED&storeCode=S001'           # 按 key 字典序：status < storeCode
+CANONICAL=$'GET\n/open/api/orders\n'"$QS"$'\n'"$AK"$'\n'"$TS"$'\n'"$NONCE"
+SIGN=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$SK" | sed 's/^.*= //')
+curl -s "http://localhost:8080/open/api/orders?$QS" \
+  -H "X-Access-Key: $AK" -H "X-Timestamp: $TS" -H "X-Nonce: $NONCE" -H "X-Signature: $SIGN"
+```
+
+验收方式（对接当天）：
+
+1. `mvn clean test` 连续跑 **两轮**（含 `OpenApiSignatureIntegrationTest`：正常/乱序/篡改/缺头/未知调用方/时间窗边界/nonce 重放/过期清理）；
+2. 现场按真实调用方密钥再验一轮，全程 **录屏**：一轮自动化 + 一轮现场录屏。

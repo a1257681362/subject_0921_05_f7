@@ -9,3 +9,12 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+
+evops:
+  openapi:
+    # 对外开放接口调用方凭据（accessKey -> HMAC 密钥）。生产用外部配置/环境变量注入真实密钥，
+    # 替换掉仓库内的联调样例
+    access-keys:
+      demo-ak: demo-secret-change-me
+    timestamp-window-seconds: 900   # 时间窗 15 分钟
+    nonce-ttl-minutes: 30           # nonce 去重窗口 30 分钟
