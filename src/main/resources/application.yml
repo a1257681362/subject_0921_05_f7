@@ -61,6 +61,18 @@ evops:
     detail-table-index: 0
     # 单次导出统计周期上限（天），防误拉全量
     max-period-days: 93
+  openapi:
+    # 对外开放加工单查询（/open/api/**，HMAC-SHA256 签名鉴权，免 Shiro Basic）
+    # 接入方 appId -> secret；生产必须用环境变量/外部配置覆盖，不要把真实密钥提交进来。
+    # 为空（未配置任何 app）时所有对外请求一律 SIGN_INVALID 拒绝。
+    apps:
+      demo-partner: ${OPENAPI_DEMO_SECRET:dev-only-please-override}
+    # 请求时间戳允许的时钟偏移（分钟）：超出 [now-w, now+w] 一律 SIGN_EXPIRED
+    timestamp-window-minutes: 15
+    # nonce 去重保留窗口（分钟）：必须大于时间窗，到期行由定时任务每分钟物理清理
+    nonce-retain-minutes: 30
+    # 过期 nonce 清理时刻（每分钟第 43 秒，避开整点）；启动时另补扫一次停机期间到期行
+    cleanup-cron: "43 * * * * ?"
 
 logging:
   level:

@@ -36,6 +36,7 @@ Spring Boot 骨架项目。技术栈：Java 8、Spring Boot 2.7、MyBatis-Plus�
 | `t_quota_ledger` | 额度明细流水（只追加，每笔动作后账户快照，按 biz_date 对账） |
 | `t_process_rework` | 加工单返修记录（只追加；取镜后登记，状态不变，返修率依据） |
 | `t_report_export_log` | 周汇总报告导出留痕（只追加；周期/门店/文件清单，不存内容） |
+| `t_openapi_nonce` | 对外开放接口签名请求 nonce 防重放（运维数据，30 分钟到期物理清理，与 t_batch_job 同属禁物理删除例外） |
 
 ## 加工单状态
 
@@ -159,6 +160,16 @@ RESERVED 占用中 ──confirm──▶ CONFIRMED 已实扣（终态，账户�
 - `POST /api/quota/release` 手工释放（过期单按超时还结算）；超时预占每分钟由定时任务自动归还（启动补扫）
 - `GET  /api/quota/reservations/{reservationNo}` 预占单
 - `GET  /api/quota/ledger?storeCode=&bizDate=` 明细流水（只追加）；`GET /api/quota/reconcile?storeCode=&bizDate=` 日结对平（balanced）
+
+对外开放查询（免 Shiro Basic，HMAC-SHA256 签名鉴权；协议与验收见 `docs/openapi-sign-acceptance.md`）：
+
+- 只读端点：`GET /open/api/orders/by-no/{orderNo}`、`GET /open/api/orders/{id}`、`GET /open/api/orders?status=&storeCode=`
+- 请求头 `X-Access-App` / `X-Timestamp`（epoch 毫秒，±15 分钟）/ `X-Nonce`（8~64 位，30 分钟去重）/ `X-Signature`
+- 签名：query 参数按 key（同 key 按 value）字典序排序、RFC3986 编码后拼 canonical，
+  对 `METHOD\nURI\nTS\nNONCE\nCANONICAL` 做 HMAC-SHA256（hex 小写）；参数发送顺序任意
+- 失败固定专用码（HTTP 401，不暴露细节）：`SIGN_INVALID` / `SIGN_EXPIRED` / `NONCE_DUPLICATED`
+- nonce 落 `t_openapi_nonce` 唯一约束判重，重复直接拒绝；到期每分钟物理清理（启动补扫），保留窗 30 分钟 > 时间窗 15 分钟
+- 接入：`evops.openapi.apps` 登记 appId→secret（生产用环境变量覆盖）；验收脚本 `scripts/openapi-acceptance.sh`，验收当天跑两轮（现场一轮、录屏一轮）
 
 示例（接口走 Shiro 认证，测试/本地可用 bootstrap/bootstrap）：
 

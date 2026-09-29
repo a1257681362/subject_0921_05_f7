@@ -9,3 +9,10 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+
+evops:
+  openapi:
+    # 对外开放查询接入方密钥；真实环境用环境变量注入，不要提交明文
+    # 启动前 export OPENAPI_PARTNER_A_SECRET=...；可按需增减 app
+    apps:
+      partner-a: ${OPENAPI_PARTNER_A_SECRET:change-me}

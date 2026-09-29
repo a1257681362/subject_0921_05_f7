@@ -6,8 +6,6 @@ import com.evops.order.dto.OrderCreateRequest;
 import com.evops.order.dto.OrderUpdateRequest;
 import com.evops.order.dto.ReworkRequest;
 import com.evops.order.entity.ProcessOrder;
-import com.evops.order.entity.ProcessOrderRx;
-import com.evops.order.entity.ProcessOrderStatusLog;
 import com.evops.order.entity.ProcessRework;
 import com.evops.order.service.ProcessOrderService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,9 +29,12 @@ import java.util.Map;
 public class ProcessOrderController {
 
     private final ProcessOrderService orderService;
+    private final OrderDetailAssembler detailAssembler;
 
-    public ProcessOrderController(ProcessOrderService orderService) {
+    public ProcessOrderController(ProcessOrderService orderService,
+                                  OrderDetailAssembler detailAssembler) {
         this.orderService = orderService;
+        this.detailAssembler = detailAssembler;
     }
 
     /** 建档：主表+左右眼处方同一事务 */
@@ -53,13 +53,13 @@ public class ProcessOrderController {
     @GetMapping("/by-no/{orderNo}")
     public ApiResponse<Map<String, Object>> getByOrderNo(@PathVariable String orderNo) {
         ProcessOrder order = orderService.getByOrderNo(orderNo);
-        return ApiResponse.ok(assembleDetail(order));
+        return ApiResponse.ok(detailAssembler.assembleDetail(order));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<Map<String, Object>> get(@PathVariable Long id) {
         ProcessOrder order = orderService.get(id);
-        return ApiResponse.ok(assembleDetail(order));
+        return ApiResponse.ok(detailAssembler.assembleDetail(order));
     }
 
     @GetMapping
@@ -109,16 +109,5 @@ public class ProcessOrderController {
 
     private OrderActionRequest action(OrderActionRequest request) {
         return request == null ? new OrderActionRequest() : request;
-    }
-
-    private Map<String, Object> assembleDetail(ProcessOrder order) {
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("order", order);
-        List<ProcessOrderRx> prescriptions = orderService.listActivePrescriptions(order.getId());
-        detail.put("prescriptions", prescriptions);
-        List<ProcessOrderStatusLog> statusLogs = orderService.listStatusLogs(order.getId());
-        detail.put("statusLogs", statusLogs);
-        detail.put("reworks", orderService.listReworks(order.getId()));
-        return detail;
     }
 }

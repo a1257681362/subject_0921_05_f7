@@ -11,6 +11,11 @@ public enum BizCode {
     DATA_DUPLICATED("DATA_DUPLICATED", "数据违反唯一约束"),
     VERSION_CONFLICT("VERSION_CONFLICT", "数据已被他人修改，请刷新后重试"),
 
+    // ---- 对外开放接口（/open/api/**）签名鉴权专用码：文案固定，不向调用方暴露任何失败细节 ----
+    SIGN_INVALID("SIGN_INVALID", "请求签名校验未通过"),
+    SIGN_EXPIRED("SIGN_EXPIRED", "请求已超出允许的时间窗口"),
+    NONCE_DUPLICATED("NONCE_DUPLICATED", "请求不可重复提交"),
+
     LENS_NOT_FOUND("LENS_NOT_FOUND", "镜片不存在"),
     LENS_CODE_DUPLICATED("LENS_CODE_DUPLICATED", "镜片编码已存在"),
     LENS_ALREADY_DISCARDED("LENS_ALREADY_DISCARDED", "镜片已作废，无需重复操作"),
